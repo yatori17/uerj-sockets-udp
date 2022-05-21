@@ -17,18 +17,18 @@ public class MensagemCliente {
             case CHAR:
                 return "{" +
                         "\"tipo\":" + "\"" + tipo.toString().toLowerCase() + "\"" +
-                        ", \"valor\":" + "\'" + valor + '\'' +
+                        ", \"val\":" + "\'" + valor + '\'' +
                         '}';
 
             case STRING:
                 return "{" +
                         "\"tipo\":" + "\"" + tipo.toString().toLowerCase() + "\"" +
-                        ", \"valor\":" + "\"" + valor + '\"' +
+                        ", \"val\":" + "\"" + valor + '\"' +
                         '}';
             case INT:
                 return "{" +
                         "\"tipo\":" + "\"" + tipo.toString().toLowerCase() + "\"" +
-                        ", \"valor\":" + valor +
+                        ", \"val\":" + valor +
                         '}';
         }
 

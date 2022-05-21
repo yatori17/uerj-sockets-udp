@@ -1,4 +1,4 @@
-t adpackage main
+package main
 
 import (
 	"encoding/json"
