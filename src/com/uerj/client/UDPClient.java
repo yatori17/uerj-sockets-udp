@@ -10,25 +10,42 @@ class UDPClient {
     public static final String DIVISORIA = "=================================================\n";
     public static final String MSG_START = "Sistema Cliente UDP Iniciado\n";
     public static final String MSG_BOAS_VINDAS = DIVISORIA + MSG_START + DIVISORIA;
-
     public static final String LOCALHOST = "LocalHost";
-
+    public static final String EXIT = "EXIT";
     public static long stopWatchStartTime = 0;
     public static long stopWatchStopTime = 0;
     public static boolean stopWatchRunning = false;
+    public static BufferedReader buffer = new BufferedReader(new InputStreamReader(System.in));
 
-    public static void main(String args[]) throws IOException {
+    public static void main(String[] args) throws IOException {
 
-        boolean validIP = false;
+        boolean running = true;
+
+        System.out.println(MSG_BOAS_VINDAS);
+
+        while (running){
+            try {
+                execute();
+            }catch (Exception e){
+                System.out.println("ERRO: " + e.getMessage());
+            }
+            System.out.println("Digite EXIT para sair, ou qualquer tecla para continuar");
+            if (buffer.readLine().equalsIgnoreCase(EXIT)){running = false;}
+        }
+
+        System.exit(1);
+
+    }
+
+    public static void execute() throws TimeOutException, IOException {
 
         String ip = null;
         String tipo = null;
         String valor = null;
         InetAddress IPAddress = null;
-
-        BufferedReader buffer = new BufferedReader(new InputStreamReader(System.in));
-
-        System.out.println(MSG_BOAS_VINDAS);
+        int porta = 0;
+        boolean validIP = false;
+        boolean validPort = false;
 
         do {
             try {
@@ -47,9 +64,18 @@ class UDPClient {
             }
         } while (!validIP);
 
-        System.out.println("Digite a porta desejada: ");
+        do {
+            try {
+                System.out.println("Digite a porta desejada: ");
 
-        int porta = Integer.parseInt(buffer.readLine());
+                porta = Integer.parseInt(buffer.readLine());
+
+                validPort = true;
+
+            }catch (NumberFormatException | IOException e){
+                System.out.println("Porta Invalida");
+            }
+        }while (!validPort);
 
         do {
             System.out.println("Digite o tipo da mensagem: ");
@@ -64,46 +90,46 @@ class UDPClient {
             valor = buffer.readLine();
         }while (!validaValor(valor,Tipo.valueOf(tipo.toUpperCase())));
 
-
         DatagramSocket clientSocket = new DatagramSocket();
 
         byte[] sendData = new byte[1024];
         byte[] receiveData = new byte[1024];
 
-        String sentence = criaJson(tipo,  valor);
+        MensagemCliente mensagemCliente = new MensagemCliente(tipo, valor);
 
-        System.out.println("Retorno: \n" + sentence + "\nIP: " + ip + "\nPorta: " + porta +"\n");
+        String sentence = mensagemCliente.toString();
+
+        System.out.println("Mensagem: \n" + sentence + "\nIP: " + ip + "\nPorta: " + porta +"\n");
 
         sendData = sentence.getBytes();
 
         DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, porta);
 
-        clientSocket.send(sendPacket);
-        //iniciar timer
-        startTimer();
-        System.out.println("Mensagem Enviada com sucesso!");
+        try {
 
-        timeOut();
+            clientSocket.send(sendPacket);
+            //iniciar timer
+            startTimer();
+            System.out.println("Mensagem Enviada com sucesso!");
 
-        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+            Timer timer = startTimeOutCountdown(clientSocket);
 
-        clientSocket.receive(receivePacket);
-        //parar timer e exibir
-        stopTimer();
+            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
-        String modifiedSentence = new String(receivePacket.getData());
+            clientSocket.receive(receivePacket);
+            //parar timer e exibir
+            stopTimer();
 
-        System.out.println("FROM SERVER: " + modifiedSentence);
-        System.out.println("Tempo decorrido: " + getElapsedMilliseconds() + "MiliSegundos");
+            String modifiedSentence = new String(receivePacket.getData());
 
-        clientSocket.close();
+            System.out.println("FROM SERVER: " + modifiedSentence);
+            System.out.println("Tempo decorrido: " + getElapsedMilliseconds() + " MiliSegundos");
 
-    }
-
-    public static String criaJson(String tipo, String valor){
-        MensagemCliente mensagemCliente = new MensagemCliente(tipo, valor);
-
-        return mensagemCliente.toString();
+            timer.cancel();
+            clientSocket.close();
+        } catch (SocketException e){
+            throw new TimeOutException();
+        }
     }
 
     public static boolean validaTipo(String tipo){
@@ -156,7 +182,7 @@ class UDPClient {
     }
 
 
-    public static long getElapsedMilliseconds() {
+    public static double getElapsedMilliseconds() {
         long elapsedTime;
 
         if (stopWatchRunning)
@@ -164,25 +190,31 @@ class UDPClient {
         else
             elapsedTime = (stopWatchStopTime - stopWatchStartTime);
 
-        long nanoSecondsPerMillisecond = 1000000;
+        double nanoSecondsPerMillisecond = 1000000;
         return elapsedTime / nanoSecondsPerMillisecond;
     }
 
-    public static void timeOut(){
+    public static Timer startTimeOutCountdown(DatagramSocket client) {
 
-        long timeout = 60000;
+        long segundos = 1000;
+
+        long minutos = segundos * 60;
+
+        Timer timer = new Timer();
+
         TimerTask task = new TimerTask() {
             @Override
             public void run() {
-                System.out.println("\nTime Out, Encerrando a aplicacao...");
-                System.exit(1);
+                System.out.println("\nTime Out, Encerrando a comunicacao...");
+                client.close();
             }
         };
+       // try {
+            timer.schedule(task, minutos);
+        //}catch (IllegalStateException ignored){}
 
-        Timer timer = new Timer();
-        timer.schedule(task, timeout);
+        return timer;
     }
-
 
 }
 
