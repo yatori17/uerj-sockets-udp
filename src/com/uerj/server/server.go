@@ -1,17 +1,18 @@
-package main
+t adpackage main
 
 import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 )
 
-type JsonEventString struct {
-	Tipo string `json:"tipo"`
-	Val  string `json:"val"`
+type SocketConstruct struct {
+	port    string
+	address string
 }
-type JsonEventInt struct {
+type JsonEvent struct {
 	Tipo string      `json:"tipo"`
 	Val  interface{} `json:"val"`
 }
@@ -19,8 +20,9 @@ type JsonEventInt struct {
 func main() {
 	port := ":3000"
 	protocol := "udp"
-	var result JsonEventInt
-	udpAddr, err := net.ResolveUDPAddr(protocol, port)
+	address := "0.0.0.0"
+	var result JsonEvent
+	udpAddr, err := net.ResolveUDPAddr(protocol, address+port)
 	if err != nil {
 		fmt.Println("Wrong Address")
 		return
@@ -35,30 +37,28 @@ func main() {
 	fmt.Printf("server listening %s\n", conn.LocalAddr().String())
 
 	for {
-		message := make([]byte, 4000)
+		message := make([]byte, 2048)
+		//recebendo a mensagem do cliente
 		rlen, remote, err := conn.ReadFromUDP(message[:])
 		if err != nil {
 			panic(err)
 		}
-
+		//log de mensagem
 		data := strings.TrimSpace(string(message[:rlen]))
+		fmt.Printf("received: %s from %s\n", data, remote)
+
 		error := json.Unmarshal(message[:rlen], &result)
 		if error != nil {
 			fmt.Println(err)
+			continue
 		}
 		resultado := defineOperation(&result)
-		result = nil
-		fmt.Printf("received: %s from %s\n", data, remote)
 		messageToSend := []byte(resultado)
-		go serve(conn, remote, messageToSend[:])
+		go serve(conn, remote, messageToSend)
 	}
 }
 
 func serve(pc net.PacketConn, addr net.Addr, buf []byte) {
-	// 0 - 1: ID
-	// 2: QR(1): Opcode(4)
-	//buf[2] |= 0x80 // Set QR bit
-
 	pc.WriteTo(buf, addr)
 }
 
@@ -83,7 +83,7 @@ func changeToLowerCaseOrUpperCase(value string) string {
 	return value
 }
 
-func defineOperation(obj1 *JsonEventInt) string {
+func defineOperation(obj1 *JsonEvent) string {
 	if obj1.Tipo == "string" {
 		obj1.Val = inverteString(obj1.Val.(string))
 	}
@@ -100,5 +100,11 @@ func defineOperation(obj1 *JsonEventInt) string {
 	if err == nil {
 		fmt.Println(err)
 	}
+	clear(obj1)
 	return string(result)
+}
+
+func clear(v interface{}) {
+	p := reflect.ValueOf(v).Elem()
+	p.Set(reflect.Zero(p.Type()))
 }
