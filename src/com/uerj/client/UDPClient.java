@@ -120,7 +120,11 @@ class UDPClient {
             //parar timer e exibir
             stopTimer();
 
-            String modifiedSentence = new String(receivePacket.getData());
+            // Pega apenas a mensagem
+            byte[] data = new byte[receivePacket.getLength()];
+            System.arraycopy(receivePacket.getData(), receivePacket.getOffset(), data, 0, receivePacket.getLength());
+
+            String modifiedSentence = new String(data);
 
             System.out.println("FROM SERVER: " + modifiedSentence);
             System.out.println("Tempo decorrido: " + getElapsedMilliseconds() + " MiliSegundos");
