@@ -127,7 +127,7 @@ class UDPClient {
             String modifiedSentence = new String(data);
 
             System.out.println("FROM SERVER: " + modifiedSentence);
-            System.out.println("Tempo decorrido: " + getElapsedMilliseconds() + " MiliSegundos");
+            System.out.println("RTT: " + getElapsedMilliseconds() + " MiliSegundos");
 
             timer.cancel();
             clientSocket.close();
