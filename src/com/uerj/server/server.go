@@ -141,11 +141,11 @@ func defineOperation(obj1 *JsonEvent, data string) string {
 		fmt.Println(obj1.Val)
 	}
 	if obj1.Tipo == "char" {
-		obj1.Val = changeToLowerCaseOrUpperCase(obj1.Val.(string))
 		if obj1.Val == nil || len(obj1.Val.(string)) != 1 {
 			println(MSG_ERROR_CHAR)
 			return ""
 		}
+		obj1.Val = changeToLowerCaseOrUpperCase(obj1.Val.(string))
 	}
 	result, err := json.Marshal(obj1)
 	if err != nil {
