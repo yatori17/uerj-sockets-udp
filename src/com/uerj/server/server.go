@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type SocketConstruct struct {
@@ -17,14 +20,36 @@ type JsonEvent struct {
 	Val  interface{} `json:"val"`
 }
 
+type peer struct {
+	stop  func()
+	since time.Time
+}
+
+var DIVISORIA string = "=================================================\n"
+var MSG_IP string = "Informe o endereço IP que rodará seu servidor: "
+var MSG_NUMERO_PORTA string = "Informe o Número da porta que rodará seu servidor: "
+var MSG_WRONG_ADDRES string = "Wrong Address"
+var protocol string = "udp"
+var MESSAGE_ERROR_CLOSING_CONN = "Error in closing the UDP Connection: "
+var MSG_SERVER_INIT = "Servidor UDP iniciado!"
+var MSG_SERVER_LIST = "server listening "
+var MSG_ERROR_CHAR = "Não foi possível converter o caracter!"
+var MSG_ERROR_JSON = "Não foi possível transformar a mensagem para json"
+var GENERATE_UDP_MESSAGE = "Gerando a mensagem para o cliente UDP "
+
 func main() {
-	port := ":3000"
-	protocol := "udp"
-	address := "0.0.0.0"
+	var porta int
+	var address string
+	fmt.Print(MSG_IP)
+	fmt.Scan(&address)
+	fmt.Print(MSG_NUMERO_PORTA)
+	fmt.Scan(&porta)
+	conexao := address + ":" + strconv.Itoa(porta)
 	var result JsonEvent
-	udpAddr, err := net.ResolveUDPAddr(protocol, address+port)
+	peers := map[string]peer{}
+	udpAddr, err := net.ResolveUDPAddr(protocol, conexao)
 	if err != nil {
-		fmt.Println("Wrong Address")
+		fmt.Println(MSG_WRONG_ADDRES)
 		return
 	}
 
@@ -33,11 +58,21 @@ func main() {
 		panic(err)
 	}
 
-	defer conn.Close()
-	fmt.Printf("server listening %s\n", conn.LocalAddr().String())
+	defer func(conn *net.UDPConn) {
+		err := conn.Close()
+		if err != nil {
+			fmt.Println(MESSAGE_ERROR_CLOSING_CONN, err)
+		}
+	}(conn)
+	message := make([]byte, 2048)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	fmt.Print(DIVISORIA + MSG_SERVER_INIT)
+	fmt.Println(MSG_SERVER_LIST, conn.LocalAddr().String())
+	fmt.Print(DIVISORIA)
 
 	for {
-		message := make([]byte, 2048)
 		//recebendo a mensagem do cliente
 		rlen, remote, err := conn.ReadFromUDP(message[:])
 		if err != nil {
@@ -46,15 +81,29 @@ func main() {
 		//log de mensagem
 		data := strings.TrimSpace(string(message[:rlen]))
 		fmt.Printf("received: %s from %s\n", data, remote)
-
-		error := json.Unmarshal(message[:rlen], &result)
+		error := json.Unmarshal([]byte(data), &result)
 		if error != nil {
-			fmt.Println(err)
+			fmt.Println(error)
 			continue
 		}
-		resultado := defineOperation(&result)
+		peer, ok := peers[remote.String()]
+		if ok {
+			continue
+		}
+		pctx, pcancel := context.WithCancel(ctx)
+		peer.stop = pcancel
+		peer.since = time.Now()
+		peers[remote.String()] = peer
+		resultado := defineOperation(&result, data)
 		messageToSend := []byte(resultado)
-		go serve(conn, remote, messageToSend)
+		go generateMessageToClientUdp(messageToSend, pctx, conn, remote)
+		for remote, p := range peers {
+			if time.Since(p.since) > time.Minute {
+				fmt.Println("Peer timedout")
+				p.stop()
+				delete(peers, remote)
+			}
+		}
 	}
 }
 
@@ -83,7 +132,7 @@ func changeToLowerCaseOrUpperCase(value string) string {
 	return value
 }
 
-func defineOperation(obj1 *JsonEvent) string {
+func defineOperation(obj1 *JsonEvent, data string) string {
 	if obj1.Tipo == "string" {
 		obj1.Val = inverteString(obj1.Val.(string))
 	}
@@ -93,11 +142,14 @@ func defineOperation(obj1 *JsonEvent) string {
 	}
 	if obj1.Tipo == "char" {
 		obj1.Val = changeToLowerCaseOrUpperCase(obj1.Val.(string))
+		if obj1.Val == nil || len(obj1.Val.(string)) != 1 {
+			println(MSG_ERROR_CHAR)
+			return ""
+		}
 	}
-
 	result, err := json.Marshal(obj1)
-
-	if err == nil {
+	if err != nil {
+		fmt.Println(MSG_ERROR_JSON)
 		fmt.Println(err)
 	}
 	clear(obj1)
@@ -107,4 +159,17 @@ func defineOperation(obj1 *JsonEvent) string {
 func clear(v interface{}) {
 	p := reflect.ValueOf(v).Elem()
 	p.Set(reflect.Zero(p.Type()))
+}
+
+func generateMessageToClientUdp(data []byte, ctx context.Context, conn *net.UDPConn, addr *net.UDPAddr) {
+	fmt.Println(GENERATE_UDP_MESSAGE, addr)
+	go func() {
+		if len(data) == 0 {
+			context.Background().Err()
+		}
+		serve(conn, addr, data)
+		time.Sleep(time.Second * 1)
+	}()
+	<-ctx.Done()
+	fmt.Println("Parando de escrever para cliente UDP", addr)
 }
