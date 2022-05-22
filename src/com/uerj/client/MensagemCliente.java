@@ -15,10 +15,6 @@ public class MensagemCliente {
         switch (tipo){
 
             case CHAR:
-                return "{" +
-                        "\"tipo\":" + "\"" + tipo.toString().toLowerCase() + "\"" +
-                        ", \"val\":" + "\'" + valor + '\'' +
-                        '}';
 
             case STRING:
                 return "{" +
