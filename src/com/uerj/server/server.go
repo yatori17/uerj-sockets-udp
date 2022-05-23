@@ -165,11 +165,11 @@ func generateMessageToClientUdp(data []byte, ctx context.Context, conn *net.UDPC
 	fmt.Println(GENERATE_UDP_MESSAGE, addr)
 	go func() {
 		if len(data) == 0 {
-			context.Background().Err()
+			return
 		}
 		serve(conn, addr, data)
 		time.Sleep(time.Second * 1)
 	}()
-	<-ctx.Done()
 	fmt.Println("Parando de escrever para cliente UDP", addr)
+	<-ctx.Done()
 }
