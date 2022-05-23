@@ -96,7 +96,7 @@ func main() {
 		peers[remote.String()] = peer
 		resultado := defineOperation(&result, data)
 		messageToSend := []byte(resultado)
-		go generateMessageToClientUdp(messageToSend, pctx, conn, remote)
+		go sendingMessageToClientUdp(messageToSend, pctx, conn, remote)
 		for remote, p := range peers {
 			if time.Since(p.since) > time.Minute {
 				fmt.Println("Peer timedout")
@@ -133,19 +133,21 @@ func changeToLowerCaseOrUpperCase(value string) string {
 }
 
 func defineOperation(obj1 *JsonEvent, data string) string {
-	if obj1.Tipo == "string" {
+	switch {
+	case obj1.Tipo == "string":
 		obj1.Val = inverteString(obj1.Val.(string))
-	}
-	if obj1.Tipo == "int" {
+
+	case obj1.Tipo == "int":
 		obj1.Val = incrementValue(int(obj1.Val.(float64)))
-		fmt.Println(obj1.Val)
-	}
-	if obj1.Tipo == "char" {
+	case obj1.Tipo == "char":
 		if obj1.Val == nil || len(obj1.Val.(string)) != 1 {
 			println(MSG_ERROR_CHAR)
 			return ""
 		}
 		obj1.Val = changeToLowerCaseOrUpperCase(obj1.Val.(string))
+	default:
+		fmt.Println("Não foi possível identificar um tipo na variável!")
+		return ""
 	}
 	result, err := json.Marshal(obj1)
 	if err != nil {
@@ -161,15 +163,14 @@ func clear(v interface{}) {
 	p.Set(reflect.Zero(p.Type()))
 }
 
-func generateMessageToClientUdp(data []byte, ctx context.Context, conn *net.UDPConn, addr *net.UDPAddr) {
-	fmt.Println(GENERATE_UDP_MESSAGE, addr)
+func sendingMessageToClientUdp(data []byte, ctx context.Context, conn *net.UDPConn, addr *net.UDPAddr) {
 	go func() {
+		fmt.Println(GENERATE_UDP_MESSAGE, string(data), " Endereço:", addr)
 		if len(data) == 0 {
 			return
 		}
 		serve(conn, addr, data)
 		time.Sleep(time.Second * 1)
 	}()
-	fmt.Println("Parando de escrever para cliente UDP", addr)
 	<-ctx.Done()
 }
